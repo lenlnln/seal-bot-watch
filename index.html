@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>電腦玩家行為</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e4e2dc;--accent:#2f6fd1;--good:#2e8b57;--bad:#c2410c;--warn:#b7791f;--bar:#2f6fd1;--bar2:#c2410c;--chip:#eef2fb}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141413;--card:#1e1e1c;--ink:#ecebe7;--muted:#9c9a93;--line:#2f2f2c;--accent:#7aa7f0;--good:#5cc28a;--bad:#f0844f;--warn:#e0b04f;--bar:#7aa7f0;--bar2:#f0844f;--chip:#24314a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,"Microsoft JhengHei","PingFang TC",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+h1{font-size:22px;margin:0}
+.sub{color:var(--muted);font-size:13px}
+select,input{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.card h2{font-size:16px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--card);cursor:pointer}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.wrap{white-space:normal;min-width:240px}
+tr.bot{cursor:pointer}
+tr.bot:hover td{background:var(--chip)}
+tr.detail td{background:var(--bg);white-space:normal}
+.feed{list-style:none;margin:0;padding:0;max-height:560px;overflow:auto}
+.feed li{display:grid;grid-template-columns:92px 120px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.feed time,.mini time{color:var(--muted);font-variant-numeric:tabular-nums}
+.feed .who{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini{margin:0;padding:0;list-style:none}
+.mini li{padding:2px 0}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--chip)}
+.bad{color:var(--bad)}.good{color:var(--good)}
+svg text{fill:var(--muted);font-size:11px}
+.empty{color:var(--muted);padding:12px 0}
+@media (max-width:560px){.feed li{grid-template-columns:72px 1fr}.feed li .msg{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>電腦玩家行為</h1>
+      <div class="sub" id="updated">載入中…</div>
+    </div>
+    <label class="sub">日期 <select id="day"></select></label>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card">
+    <h2>每小時 <select id="metric"></select></h2>
+    <div id="chart"></div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="feed" aria-selected="true">最新動作</button>
+    <button role="tab" data-tab="roster">各 bot 現況</button>
+    <button role="tab" data-tab="stats">當天統計</button>
+    <button role="tab" data-tab="issues">錯誤與問題</button>
+  </nav>
+
+  <section class="card" id="tab-feed">
+    <h2>最新動作 <input id="q" type="search" placeholder="搜尋名稱或動作，例如 精煉、賣得"></h2>
+    <ul class="feed" id="feed"></ul>
+  </section>
+  <section class="card" id="tab-roster" hidden>
+    <h2>各 bot 現況 <span class="sub">點一列看最近 15 個動作</span></h2>
+    <div class="scroll"><table id="roster"></table></div>
+  </section>
+  <section class="card" id="tab-stats" hidden>
+    <h2>當天各 bot 統計 <span class="sub">點欄位名稱排序</span></h2>
+    <div class="scroll"><table id="stats"></table></div>
+  </section>
+  <section class="card" id="tab-issues" hidden>
+    <div id="issues"></div>
+  </section>
+  <p class="sub">資料每小時更新一次，頁面每 10 分鐘自動重新讀取。</p>
+</main>
+<script>
+const KPI = ['擊倒','升級','被打倒','斷線','賣得金額','精煉成功','擺攤','收購攤'];
+const METRICS = ['擊倒','被打倒','斷線','錯誤','賣得金額','升級','精煉成功','買水瓶數','釣魚'];
+const STAT_COLS = ['等級','擊倒','經驗','升級','被打倒','斷線','錯誤','賣得金額','精煉成功','精煉失敗','釣魚','地點'];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = v => typeof v === 'number' ? v.toLocaleString('zh-TW') : (v ?? '');
+let D = null, sortKey = '擊倒', sortDir = -1;
+try { const t = localStorage.getItem('botTab'); if (t) setTimeout(() => showTab(t)); } catch (e) {}
+
+function load() {
+  const s = document.createElement('script');
+  s.src = 'data.js?t=' + Date.now();
+  s.onload = () => { D = window.BOT_DATA; s.remove(); render(); };
+  s.onerror = () => { $('#updated').textContent = '讀取資料失敗，稍後再試'; s.remove(); };
+  document.head.appendChild(s);
+}
+function days() { return Object.keys(D.days).sort().reverse(); }
+function cur() { return D.days[$('#day').value] || {hours:{}, bots:[], errors:{}, problems:{}, stalls:{}, refine:{}, buys:{}}; }
+function total(day) { const t = {}; for (const h of Object.values(day.hours)) for (const [k, v] of Object.entries(h)) t[k] = (t[k] || 0) + v; return t; }
+
+function render() {
+  $('#updated').textContent = '最後更新：' + D.updated;
+  const sel = $('#day'), keep = sel.value;
+  sel.innerHTML = days().map(d => `<option>${d}</option>`).join('');
+  if (keep && D.days[keep]) sel.value = keep;
+  if (!$('#metric').options.length) $('#metric').innerHTML = METRICS.map(m => `<option>${m}</option>`).join('');
+  renderDay(); renderFeed(); renderRoster();
+}
+function renderDay() {
+  const day = cur(), t = total(day);
+  $('#kpis').innerHTML = KPI.map(k => `<div class="kpi"><b>${fmt(t[k] || 0)}</b><span>${k}</span></div>`).join('');
+  renderChart(day); renderStats(day); renderIssues(day);
+}
+function renderChart(day) {
+  const m = $('#metric').value, hrs = [...Array(24).keys()].map(h => String(h).padStart(2, '0'));
+  const vals = hrs.map(h => (day.hours[h] || {})[m] || 0), max = Math.max(1, ...vals);
+  const W = 720, H = 180, pad = 24, bw = (W - pad) / 24;
+  const bad = ['被打倒','斷線','錯誤'].includes(m);
+  let s = `<svg viewBox="0 0 ${W} ${H + 20}" width="100%" role="img" aria-label="每小時${m}">`;
+  vals.forEach((v, i) => {
+    const h = v / max * (H - 20), x = pad + i * bw;
+    s += `<rect x="${x + 2}" y="${H - h}" width="${bw - 4}" height="${h}" rx="3" fill="var(${bad ? '--bar2' : '--bar'})"><title>${hrs[i]} 時：${fmt(v)}</title></rect>`;
+    if (i % 3 === 0) s += `<text x="${x + bw / 2}" y="${H + 14}" text-anchor="middle">${hrs[i]}</text>`;
+  });
+  s += `<text x="0" y="12">${fmt(max)}</text></svg>`;
+  $('#chart').innerHTML = vals.some(v => v) ? s : `<div class="empty">這天沒有「${m}」的紀錄</div>`;
+}
+function renderFeed() {
+  const q = $('#q').value.trim();
+  const rows = D.feed.slice().reverse().filter(r => !q || r[1].includes(q) || r[2].includes(q));
+  $('#feed').innerHTML = rows.length ? rows.map(r => `<li><time>${esc(r[0])}</time><span class="who">${esc(r[1])}</span><span class="msg">${esc(r[2])}</span></li>`).join('')
+    : '<li class="empty">沒有符合的動作</li>';
+}
+function renderRoster() {
+  const head = ['名稱','工作','職業','等級','最後時間','最後動作'];
+  $('#roster').innerHTML = `<thead><tr>${head.map(h => `<th${h === '等級' ? ' class="num"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>` +
+    D.roster.map((b, i) => `<tr class="bot" data-i="${i}"><td><b>${esc(b['名稱'])}</b></td><td><span class="tag">${esc(b['工作'])}</span></td><td>${esc(b['職業'])}</td>` +
+      `<td class="num">${fmt(b['等級'])}</td><td>${esc(b['最後時間'])}</td><td class="wrap">${esc(b['最後動作'])}</td></tr>`).join('') + '</tbody>';
+}
+$('#roster').addEventListener('click', e => {
+  const tr = e.target.closest('tr.bot'); if (!tr) return;
+  if (tr.nextElementSibling && tr.nextElementSibling.classList.contains('detail')) { tr.nextElementSibling.remove(); return; }
+  const b = D.roster[tr.dataset.i], list = (D.recent[b['名稱']] || []).slice().reverse();
+  const td = list.length ? `<ul class="mini">${list.map(r => `<li><time>${esc(r[0])}</time>　${esc(r[1])}</li>`).join('')}</ul>` : '<div class="empty">還沒有動作紀錄</div>';
+  tr.insertAdjacentHTML('afterend', `<tr class="detail"><td colspan="6">${td}</td></tr>`);
+});
+function renderStats(day) {
+  const cols = STAT_COLS.filter(c => day.bots.some(b => b[c]));
+  const rows = day.bots.filter(b => cols.some(c => c !== '斷線' && c !== '錯誤' && b[c]))
+    .sort((a, b) => { const x = a[sortKey] ?? -Infinity, y = b[sortKey] ?? -Infinity; return (x > y ? 1 : x < y ? -1 : 0) * sortDir; });
+  if (!rows.length) { $('#stats').innerHTML = '<tr><td class="empty">這天沒有 bot 動作</td></tr>'; return; }
+  const num = c => c !== '地點';
+  $('#stats').innerHTML = `<thead><tr><th data-k="名稱">名稱</th>${cols.map(c => `<th data-k="${c}"${num(c) ? ' class="num"' : ''}>${c}${c === sortKey ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(b => `<tr><td><b>${esc(b['名稱'])}</b></td>${cols.map(c => `<td${num(c) ? ' class="num' + ((c === '被打倒' || c === '錯誤') && b[c] ? ' bad' : '') + '"' : ''}>${esc(fmt(b[c]))}</td>`).join('')}</tr>`).join('') + '</tbody>';
+}
+$('#stats').addEventListener('click', e => {
+  const th = e.target.closest('th'); if (!th) return;
+  const k = th.dataset.k; sortDir = k === sortKey ? -sortDir : -1; sortKey = k; renderStats(cur());
+});
+function renderIssues(day) {
+  const block = (title, obj) => {
+    const rows = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, 15);
+    return `<h2>${title}</h2>` + (rows.length ? `<div class="scroll"><table><tbody>${rows.map(([k, v]) => `<tr><td class="wrap">${esc(k)}</td><td class="num">${fmt(v)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">沒有</div>');
+  };
+  $('#issues').innerHTML = block('錯誤類型', day.errors) + '<br>' + block('問題紀錄', day.problems) + '<br>' + block('精煉', day.refine) + '<br>' + block('開攤位置', day.stalls) + '<br>' + block('買的藥水', day.buys);
+}
+function showTab(t) {
+  document.querySelectorAll('[role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  document.querySelectorAll('[id^=tab-]').forEach(s => s.hidden = s.id !== 'tab-' + t);
+  try { localStorage.setItem('botTab', t); } catch (e) {}
+}
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+$('#day').addEventListener('change', renderDay);
+$('#metric').addEventListener('change', () => renderChart(cur()));
+$('#q').addEventListener('input', renderFeed);
+load(); setInterval(load, 600000);
+</script>
+</body>
+</html>
