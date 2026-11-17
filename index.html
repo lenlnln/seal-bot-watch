@@ -43,6 +43,14 @@ tr.detail td{background:var(--bg);white-space:normal}
 .bad{color:var(--bad)}.good{color:var(--good)}
 svg text{fill:var(--muted);font-size:11px}
 .empty{color:var(--muted);padding:12px 0}
+.parties{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.party{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.party h3{margin:0 0 4px;font-size:16px;display:flex;justify-content:space-between;gap:8px}
+.party .meta{color:var(--muted);font-size:13px;margin-bottom:8px}
+.party table{font-size:13px}
+.party td,.party th{padding:5px 6px}
+.party .log{margin-top:10px;font-size:13px;border-top:1px solid var(--line);padding-top:8px}
+.lead{font-size:11px;color:var(--accent);margin-left:4px}
 @media (max-width:560px){.feed li{grid-template-columns:72px 1fr}.feed li .msg{grid-column:1/-1}}
 </style>
 </head>
@@ -65,6 +73,7 @@ svg text{fill:var(--muted);font-size:11px}
 
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="feed" aria-selected="true">最新動作</button>
+    <button role="tab" data-tab="party">組隊隊伍</button>
     <button role="tab" data-tab="roster">各 bot 現況</button>
     <button role="tab" data-tab="stats">當天統計</button>
     <button role="tab" data-tab="issues">錯誤與問題</button>
@@ -73,6 +82,10 @@ svg text{fill:var(--muted);font-size:11px}
   <section class="card" id="tab-feed">
     <h2>最新動作 <input id="q" type="search" placeholder="搜尋名稱或動作，例如 精煉、賣得"></h2>
     <ul class="feed" id="feed"></ul>
+  </section>
+  <section id="tab-party" hidden>
+    <p class="sub" id="party-time"></p>
+    <div class="parties" id="parties"></div>
   </section>
   <section class="card" id="tab-roster" hidden>
     <h2>各 bot 現況 <span class="sub">點一列看最近 15 個動作</span></h2>
@@ -114,7 +127,20 @@ function render() {
   sel.innerHTML = days().map(d => `<option>${d}</option>`).join('');
   if (keep && D.days[keep]) sel.value = keep;
   if (!$('#metric').options.length) $('#metric').innerHTML = METRICS.map(m => `<option>${m}</option>`).join('');
-  renderDay(); renderFeed(); renderRoster();
+  renderDay(); renderFeed(); renderRoster(); renderParties();
+}
+function renderParties() {
+  const P = D.parties || {list: []};
+  $('#party-time').textContent = P.list.length ? `共 ${P.list.length} 隊，隊伍在 ${P.time} 編好。擊倒、經驗是今天累計；祭司是隊長。` : '';
+  $('#parties').innerHTML = P.list.length ? P.list.map(p => {
+    const kills = p.members.reduce((s, m) => s + (m['擊倒'] || 0), 0);
+    const rows = p.members.map(m => `<tr><td><b>${esc(m['名稱'])}</b>${m['隊長'] ? '<span class="lead">隊長</span>' : ''}</td><td>${esc(m['職業'])}</td>` +
+      `<td class="num">${fmt(m['等級'])}</td><td class="num">${fmt(m['擊倒'])}</td><td class="num">${fmt(m['經驗'])}</td><td class="num${m['被打倒'] ? ' bad' : ''}">${fmt(m['被打倒'])}</td></tr>`).join('');
+    const log = p['動態'].length ? `<ul class="mini log">${p['動態'].map(r => `<li><time>${esc(r[0])}</time>　${esc(r[1])}</li>`).join('')}</ul>` : '<div class="log empty">還沒有這隊的動態</div>';
+    return `<article class="party"><h3><span>隊 ${p['隊']}</span><span class="tag">${esc(p['伺服器'])}</span></h3>` +
+      `<div class="meta">${esc(p['等級帶'])}・今天合計擊倒 ${fmt(kills)}</div>` +
+      `<div class="scroll"><table><thead><tr><th>名稱</th><th>職業</th><th class="num">等級</th><th class="num">擊倒</th><th class="num">經驗</th><th class="num">被打倒</th></tr></thead><tbody>${rows}</tbody></table></div>${log}</article>`;
+  }).join('') : '<div class="card empty">目前沒有組隊隊伍</div>';
 }
 function renderDay() {
   const day = cur(), t = total(day);
